@@ -22,6 +22,49 @@ VM_GW=192.168.112.1
 VM_DNS=192.168.112.2
 VM_NTP=192.168.178.1
 
+PARAMS=""
+while (( "$#" )); do
+  case "$1" in
+    --centos)
+      if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+        CENTOS=$2
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
+      ;;
+    --cloudvision)
+      if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+        CLOUDVISION=$2
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
+      ;;
+    -a|--apikey)
+      if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+        ARISTA_APIKEY=$2
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
+      ;;
+    -*|--*=) # unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done
+# set positional arguments in their proper place
+eval set -- "$PARAMS"
+
 function init {
     if test -f "/etc/redhat-release"; then
         DISTRO=$(gawk 'match($0, /.*^ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
@@ -29,7 +72,7 @@ function init {
         if [ "$DISTRO" = "centos" ]; then
             if [ "$VERSION" = "8" ]; then
                 echo "Detected $DISTRO $VERSION"
-                dnf install libvirt virt-install python3 python3-pip
+                dependencies_rhel8
             else
                 echo "Unsupported distro version (Detected $DISTRO $VERSION)"
                 exit 1
@@ -39,8 +82,11 @@ function init {
             exit 1
         fi
     fi
-
     mkdir -p /tmp/cvp/cloudvision
+}
+
+function dependencies_rhel8 {
+    dnf install -y libvirt virt-install python3 python3-pip
 }
 
 function download_centos {
@@ -197,8 +243,22 @@ function install {
 
 cleanup_vm
 init
-download_centos
-download_cloudvision
-generate_cloudvision_image
+if [ -n "${CENTOS}" ]; then
+    if [ "${CENTOS}" == 'download' ]; then
+        echo "Downloading CentOS base image and copying to /var/lib/libvirt/boot"
+        download_centos;
+        copy_centos;
+    else
+        echo "'--centos' requires either the parameter 'download' or a local path to the CentOS image"
+    fi
+else
+    echo "Error: Required parameter '--centos' is missing" >&2
+    exit 1
+fi
+if [ -n "${CLOUDVISION}" ]; then 
+    echo "Downloading Arista CloudVision $CVP_VERSION and copying to /var/lib/libvirt/boot"
+    download_cloudvision
+    generate_cloudvision_image;
+fi
 generate_ks
 install
