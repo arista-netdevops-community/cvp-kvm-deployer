@@ -18,6 +18,7 @@
 #   --cloudvision <'download' or local file> \
 #   --version <CloudVision - only required if '--cloudvision download'> \
 #   --apikey <API key from arista.com - only required if '--cloudvision download'> \
+#   --libvirt-bridge <optional - (default: 'cvpbr0') - Bridge VM will be connected to> \
 #   --cpu <Amount of vCPUs - minimum 8> \
 #   --memory <Amount of memory in GB - minimum 16> \
 #   --rootsize <Amount of root filesystem in GB - minimum 35> \
@@ -649,7 +650,7 @@ function vm_install {
         --location=$LIBVIRT_BOOT/centos.iso \
         --network=bridge=$LIBVIRT_BRIDGE,model=virtio \
         --disk path=$LIBVIRT_IMAGES/$LIBVIRT_VMNAME.root.img,size=$VM_DISK_ROOT,bus=virtio,format=raw \
-        --disk path=$LIBVIRT_IMAGES/images/$LIBVIRT_VMNAME.data.img,size=$VM_DISK_DATA,bus=virtio,format=raw \
+        --disk path=$LIBVIRT_IMAGES/$LIBVIRT_VMNAME.data.img,size=$VM_DISK_DATA,bus=virtio,format=raw \
         --disk path=$LIBVIRT_IMAGES/cvp.iso,device=cdrom,bus=sata,readonly=yes \
         --initrd-inject=/tmp/cvp/ks.cfg \
         --extra-args "console=tty0 console=ttyS0,115200 rd_NO_PLYMOUTH ks=file:/ks.cfg inst.sshd" \
