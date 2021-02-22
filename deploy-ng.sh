@@ -2,22 +2,31 @@
 # == Usage (Hypervisor network config)
 # ./deploy.sh \
 #   --network
-#   --host-nic <Host NIC of the hypervisor> \
-#   --host-ip <Host IP + CIDR of the hypervisor - only required if '--host_nic' and '--libvirt_nic are the same'> \
-#   --host-gw <Gateway of the hypervisor - only required if '--host_nic' and '--libvirt_nic are the same'> \
-#   --host-dns <DNS server of the hypervisor - only required if '--host_nic' and '--libvirt_nic are the same'> \
-#   --host-vlan <Host VLAN (tagged) on Host NIC - optional>
+#   --host-nic <Host NIC> \
+#   --host-ip <Host IP plus CIDR - only required if '--host_nic' and '--libvirt_nic are the same'> \
+#   --host-gw <Host gateway - only required if '--host_nic' and '--libvirt_nic are the same'> \
+#   --host-dns <Host DNS server - only required if '--host_nic' and '--libvirt_nic are the same'> \
+#   --host-vlan <optional - Host VLAN (tagged) on Host NIC>
 #   --libvirt-nic <NIC for libvirt use> \
-#   --libvirt-bridge <Bridge for libvirt use (do not use 'virbr0')> \
-#   --libvirt-vlan <libvirt VLAN (tagged) on Host NIC - optional>
+#   --libvirt-bridge <optional - (default: 'cvpbr0') - Bridge for libvirt use (do not use 'virbr0')> \
+#   --libvirt-vlan <optional - libvirt VLAN (tagged) on Host NIC>
 # ===========================================================================================
 # == Usage (CVP VM)
 # ./deploy.sh \
 #   --vm
 #   --centos <'download' or local file> \
 #   --cloudvision <'download' or local file> \
-#   --apikey <API key from arista.com - only required if '--cloudvision download'> \
 #   --version <CloudVision - only required if '--cloudvision download'> \
+#   --apikey <API key from arista.com - only required if '--cloudvision download'> \
+#   --cpu <Amount of vCPUs - minimum 8> \
+#   --memory <Amount of memory in GB - minimum 16> \
+#   --rootsize <Amount of root filesystem in GB - minimum 35> \
+#   --datasize <Amount of data filesystem in GB - minimum 101> \
+#   --vm-fqdn <CVP hostname plus full qualified domain name> \
+#   --vm-ip <CVP IP + CIDR> \
+#   --vm-gw <CVP gateway> \
+#   --vm-dns <CVP DNS> \
+#   --vm-ntp <CVP NTP>
 # ===========================================================================================
 # == Supported host operating systems
 # * CentOS/RHEL 8.3
@@ -25,6 +34,26 @@
 # == Florian Hibler <florian@arista.com>
 # ===========================================================================================
 
+# ===========================================================================================
+# == Default settings
+# ===========================================================================================
+LIBVIRT_BRIDGE=cvpbr0
+LIBVIRT_BOOT=/var/lib/libvirt/boot
+LIBVIRT_IMAGES=/var/lib/libvirt/images
+
+# ===========================================================================================
+# == General functions 
+# ===========================================================================================
+
+function cidr_to_netmask {
+    M=$(( 0xffffffff ^ ((1 << (32-$1)) -1) ))
+    echo "$(( (M>>24) & 0xff )).$(( (M>>16) & 0xff )).$(( (M>>8) & 0xff )).$(( M & 0xff ))"
+    unset M
+}
+
+# ===========================================================================================
+# == Argument parser
+# ===========================================================================================
 PWD=$(pwd)
 PARAMS=""
 while (( "$#" )); do
@@ -145,6 +174,105 @@ while (( "$#" )); do
                 exit 1
             fi
             ;;
+         --cpu)
+            if [ -n "$2" ] && [ "${2}" -lt 8  ]; then
+                echo "Error: Minimum of 8 VM CPUs required" >&2
+                exit 1
+            elif [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_CPU=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --memory)
+            if [ -n "$2" ] && [ "${2}" -lt 16  ]; then
+                echo "Error: Minimum of 16 GB memory required" >&2
+                exit 1        
+            elif [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_MEMORY=$(expr $2 \* 1024)
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --rootsize)
+            if [ -n "$2" ] && [ "${2}" -lt 35  ]; then
+                echo "Error: Minimum of 35 GB HDD for root filesystem required" >&2
+                exit 1       
+            elif [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_DISK_ROOT=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --datasize)
+            if [ -n "$2" ] && [ "${2}" -lt 101  ]; then
+                echo "Error: Minimum of 101 GB HDD for root filesystem required" >&2
+                exit 1       
+            elif [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_DISK_DATA=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --vm-fqdn)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_FQDN=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --vm-ip)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_IP=$(echo $2 | cut -f1 -d'/')
+                VM_CIDR=$(echo $2 | cut -f2 -d'/')
+                if [ ${#VM_CIDR} != "2" ]; then
+                    echo "Error: No CIDR for $1 is specified." >&2
+                    exit 1
+                fi
+                VM_NETMASK=$(cidr_to_netmask ${VM_CIDR})
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --vm-gw)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_GW=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --vm-dns)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_DNS=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --vm-ntp)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                VM_NTP=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;           
         --assume-yes)
                 ASSUME_YES=1
                 shift
@@ -163,10 +291,8 @@ done
 eval set -- "$PARAMS"
 
 # ===========================================================================================
-# == Path variables
+# == Host OS related functions 
 # ===========================================================================================
-LIBVIRT_BOOT=/var/lib/libvirt/boot
-LIBVIRT_IMAGES=/var/lib/libvirt/images
 
 function distro_check {
     if [ -f "/etc/redhat-release" ]; then
@@ -202,7 +328,7 @@ function init {
 }
 
 function deps_rhel8 {
-    dnf install -y libvirt virt-install rsync
+    dnf install -y libvirt virt-install libvirt-daemon-kvm rsync
     systemctl enable libvirtd
     systemctl start libvirtd
 }
@@ -353,7 +479,9 @@ function centos_check {
 function cloudvision_download {
     CLOUDVISION=/tmp/cvp/cloudvision/cvp-rpm-installer-$CLOUDVISION_VERSION
     CLOUDVISION_DOWNLOAD=1
-    if [ -f "${CLOUDVISION}" ]; then
+    if [ -f "${CLOUDVISION}" ] && [ -f "${ASSUME_YES}" ]; then
+        rm -Rf /tmp/cvp/cloudvision/cvp-rpm-installer-$CLOUDVISION_VERSION
+    elif [ -f "${CLOUDVISION}" ]; then
         while true; do
             read -p "[DEPLOYER] CloudVision Installer already found. Do you want to re-download? (yes/no) " yn
             case $yn in
@@ -403,32 +531,6 @@ function cloudvision_check {
 # ===========================================================================================
 # == VM related functions
 # ===========================================================================================
-
-function vm_install {
-    virt-install \
-        --virt-type=kvm \
-        --name cvp \
-        --memory=$VM_MEM,maxmemory=$VM_MEM \
-        --cpu host-passthrough \
-        --vcpus=$VM_VCPU --os-variant=rhel7.7 \
-        --location=/var/lib/libvirt/boot/CentOS-7-x86_64-Minimal-1908.iso \
-        --network=bridge=$VM_NET,model=virtio \
-        --disk path=/var/lib/libvirt/images/cvp.root.img,size=$VM_DISKSIZE_ROOT,bus=virtio,format=raw \
-        --disk path=/var/lib/libvirt/images/cvp.data.img,size=$VM_DISKSIZE_DATA,bus=virtio,format=raw \
-        --disk path=/var/lib/libvirt/images/cvp.iso,device=cdrom,bus=sata,readonly=yes \
-        --initrd-inject=/tmp/cvp/ks.cfg \
-        --extra-args "console=tty0 console=ttyS0,115200 rd_NO_PLYMOUTH ks=file:/ks.cfg inst.sshd" \
-        --graphics none \
-        --autostart \
-        --noreboot
-
-    virt-xml cvp --remove-device --disk 3
-    virt-xml cvp --remove-device --disk 3
-    virsh define /etc/libvirt/qemu/cvp.xml
-
-    virsh start cvp
-    virsh console cvp
-}
 
 function vm_generate_ks {
     touch /tmp/cvp/ks.cfg
@@ -521,6 +623,12 @@ cd /
 umount /tmp/cvprpm
 %end
 
+# Disable CentOS online repositories
+%post --log=/tmp/ks-disable-repos.log
+yum-config-manager --disable base,updates,extras
+yum repolist
+%end
+
 # Enforce password policies
 %anaconda
 pwpolicy root --minlen=6 --minquality=1 --notstrict --nochanges --notempty
@@ -530,10 +638,35 @@ pwpolicy luks --minlen=6 --minquality=1 --notstrict --nochanges --notempty
 EOF
 }
 
+function vm_install {
+    virt-install \
+        --virt-type=kvm \
+        --name cvp \
+        --memory=$VM_MEMORY,maxmemory=$VM_MEMORY \
+        --cpu host-passthrough \
+        --vcpus=$VM_CPU --os-variant=rhel7.7 \
+        --location=$LIBVIRT_BOOT/centos.iso \
+        --network=bridge=$LIBVIRT_BRIDGE,model=virtio \
+        --disk path=$LIBVIRT_IMAGES/cvp.root.img,size=$VM_DISK_ROOT,bus=virtio,format=raw \
+        --disk path=$LIBVIRT_IMAGES/images/cvp.data.img,size=$VM_DISK_DATA,bus=virtio,format=raw \
+        --disk path=$LIBVIRT_IMAGES/cvp.iso,device=cdrom,bus=sata,readonly=yes \
+        --initrd-inject=/tmp/cvp/ks.cfg \
+        --extra-args "console=tty0 console=ttyS0,115200 rd_NO_PLYMOUTH ks=file:/ks.cfg inst.sshd" \
+        --graphics none \
+        --autostart \
+        --noreboot
+
+    virt-xml cvp --remove-device --disk 3
+    virt-xml cvp --remove-device --disk 3
+    virsh define /etc/libvirt/qemu/cvp.xml
+
+    virsh start cvp
+}
+
 function vm_cleanup {
     virsh destroy cvp
     virsh undefine cvp
-    rm -Rf /var/lib/libvirt/images/cvp.root.img /var/lib/libvirt/images/cvp.data.img
+    rm -Rf $LIBVIRT_IMAGES/cvp.root.img $LIBVIRT_IMAGES/images/cvp.data.img
 }
 
 function cleanup {
@@ -550,7 +683,7 @@ if [ "${NETWORK}" == 1 ] && [ "${VM}" == 1 ]; then
     echo "[DEPLOYER] Error: Network configuration and VM setup cannot be conducted at the same time."
     exit 1
 elif [ -n "${NETWORK}" ]; then
-    if [ -n "${HOST_NIC}" ] && [ -n "${LIBVIRT_NIC}" ] && [ -n "${LIBVIRT_BRIDGE}" ]; then
+    if [ -n "${HOST_NIC}" ] && [ -n "${LIBVIRT_NIC}" ]; then
         if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
             if [ -n "${HOST_IP}" ] && [ -n "${HOST_GW}" ] && [ -n "${HOST_DNS}" ]; then
                 'network_'$DETECTED_DISTRO'_network_'$DETECTED_METHOD
@@ -568,34 +701,40 @@ elif [ -n "${NETWORK}" ]; then
     fi
 elif [ -n "${VM}" ]; then
     if [ -n "${CENTOS}" ] && [ -n "${CLOUDVISION}" ]; then
-        init
-        if [ "${CENTOS}" == 'download' ]; then
-            centos_download
-        fi
-        if [ -f "${CENTOS}" ]; then
-            centos_copy
-            centos_check
-        else
-            echo "[DEPLOYER] Error: '--centos' specified local file cannot be found" >&2
-            exit 1
-        fi
-        if [ "${CLOUDVISION}" == 'download' ]; then
-            if [ ! -n "${APIKEY}" ]; then
-                echo "[DEPLOYER] Error: '--apikey' for arista.com has to be specified in order to download CloudVision" >&2
+        if [ -n "${VM_CPU}" ] && [ -n "${VM_MEMORY}" ] && [ -n "${VM_DISK_ROOT}" ] && [ -n "${VM_DISK_DATA}" ] && [ -n "${VM_FQDN}" ] && [ -n "${VM_IP}" ] && [ -n "${VM_NETMASK}" ] && [ -n "${VM_GW}" ] && [ -n "${VM_DNS}" ] && [ -n "${VM_NTP}" ]; then
+            init
+            if [ "${CENTOS}" == 'download' ]; then
+                centos_download
+            fi
+            if [ -f "${CENTOS}" ]; then
+                centos_copy
+                centos_check
+            else
+                echo "[DEPLOYER] Error: '--centos' specified local file cannot be found" >&2
                 exit 1
             fi
-            if [ ! -n "${CLOUDVISION_VERSION}" ]; then
-                echo "[DEPLOYER] Error: '--version' has to be specified in order to download CloudVision" >&2
+            if [ "${CLOUDVISION}" == 'download' ]; then
+                if [ ! -n "${APIKEY}" ]; then
+                    echo "[DEPLOYER] Error: '--apikey' for arista.com has to be specified in order to download CloudVision" >&2
+                    exit 1
+                fi
+                if [ ! -n "${CLOUDVISION_VERSION}" ]; then
+                    echo "[DEPLOYER] Error: '--version' has to be specified in order to download CloudVision" >&2
+                    exit 1
+                fi
+                cloudvision_download
+            fi
+            if [ -f "${CLOUDVISION}" ]; then
+                cloudvision_geniso
+                cloudvision_check
+            else
+                echo "[DEPLOYER] Error: '--cloudvision' specified local file cannot be found" >&2
                 exit 1
             fi
-            cloudvision_download
-        fi
-        if [ -f "${CLOUDVISION}" ]; then
-            cloudvision_geniso
-            cloudvision_check
+            vm_generate_ks
+            vm_install
         else
-            echo "[DEPLOYER] Error: '--cloudvision' specified local file cannot be found" >&2
-            exit 1
+            echo "[DEPLOYER] Error: VM specification parameters are missing." >&2
         fi
     else
         echo "[DEPLOYER] Error: Required parameter '--centos' or '--cloudvision' is missing" >&2
