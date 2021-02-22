@@ -40,6 +40,7 @@
 LIBVIRT_BRIDGE=cvpbr0
 LIBVIRT_BOOT=/var/lib/libvirt/boot
 LIBVIRT_IMAGES=/var/lib/libvirt/images
+LIBVIRT_VMNAME=cvp
 
 # ===========================================================================================
 # == General functions 
@@ -641,14 +642,14 @@ EOF
 function vm_install {
     virt-install \
         --virt-type=kvm \
-        --name cvp \
+        --name $LIBVIRT_VMNAME \
         --memory=$VM_MEMORY,maxmemory=$VM_MEMORY \
         --cpu host-passthrough \
         --vcpus=$VM_CPU --os-variant=rhel7.7 \
         --location=$LIBVIRT_BOOT/centos.iso \
         --network=bridge=$LIBVIRT_BRIDGE,model=virtio \
-        --disk path=$LIBVIRT_IMAGES/cvp.root.img,size=$VM_DISK_ROOT,bus=virtio,format=raw \
-        --disk path=$LIBVIRT_IMAGES/images/cvp.data.img,size=$VM_DISK_DATA,bus=virtio,format=raw \
+        --disk path=$LIBVIRT_IMAGES/$LIBVIRT_VMNAME.root.img,size=$VM_DISK_ROOT,bus=virtio,format=raw \
+        --disk path=$LIBVIRT_IMAGES/images/$LIBVIRT_VMNAME.data.img,size=$VM_DISK_DATA,bus=virtio,format=raw \
         --disk path=$LIBVIRT_IMAGES/cvp.iso,device=cdrom,bus=sata,readonly=yes \
         --initrd-inject=/tmp/cvp/ks.cfg \
         --extra-args "console=tty0 console=ttyS0,115200 rd_NO_PLYMOUTH ks=file:/ks.cfg inst.sshd" \
@@ -656,17 +657,17 @@ function vm_install {
         --autostart \
         --noreboot
 
-    virt-xml cvp --remove-device --disk 3
-    virt-xml cvp --remove-device --disk 3
-    virsh define /etc/libvirt/qemu/cvp.xml
+    virt-xml $LIBVIRT_VMNAME --remove-device --disk 3
+    virt-xml $LIBVIRT_VMNAME --remove-device --disk 3
+    virsh define /etc/libvirt/qemu/$LIBVIRT_VMNAME.xml
 
-    virsh start cvp
+    virsh start $LIBVIRT_VMNAME
 }
 
 function vm_cleanup {
-    virsh destroy cvp
-    virsh undefine cvp
-    rm -Rf $LIBVIRT_IMAGES/cvp.root.img $LIBVIRT_IMAGES/images/cvp.data.img
+    virsh destroy $LIBVIRT_VMNAME
+    virsh undefine $LIBVIRT_VMNAME
+    rm -Rf $LIBVIRT_IMAGES/$LIBVIRT_VMNAME.root.img $LIBVIRT_IMAGES/images/$LIBVIRT_VMNAME.data.img
 }
 
 function cleanup {
