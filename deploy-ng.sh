@@ -1,4 +1,11 @@
 # ===========================================================================================
+# Automated CloudVision on KVM Deployment
+# == Florian Hibler <florian@arista.com>
+# ===========================================================================================
+# == Supported host operating systems
+# * Red Hat Enterprise Linux/CentOS 7.9
+# * Red Hat Enterprise Linux/CentOS 8.3
+# ===========================================================================================
 # == Usage (Hypervisor network config)
 # ./deploy.sh \
 #   --network
@@ -22,17 +29,16 @@
 #   --cpu <Amount of vCPUs - minimum 8> \
 #   --memory <Amount of memory in GB - minimum 16> \
 #   --rootsize <Amount of root filesystem in GB - minimum 35> \
-#   --datasize <Amount of data filesystem in GB - minimum 101> \
+#   --datasize <Amount of data filesystem in GB - minimum 110> \
 #   --vm-fqdn <CVP hostname plus full qualified domain name> \
 #   --vm-ip <CVP IP + CIDR> \
 #   --vm-gw <CVP gateway> \
 #   --vm-dns <CVP DNS> \
 #   --vm-ntp <CVP NTP>
 # ===========================================================================================
-# == Supported host operating systems
-# * CentOS/RHEL 8.3
-# ===========================================================================================
-# == Florian Hibler <florian@arista.com>
+# == Usage (CVP VM - Cleanup for reinstall)
+# ./deploy.sh \
+#   --vm-cleanup
 # ===========================================================================================
 
 # ===========================================================================================
@@ -213,8 +219,8 @@ while (( "$#" )); do
             fi
             ;;
         --datasize)
-            if [ -n "$2" ] && [ "${2}" -lt 101  ]; then
-                echo "Error: Minimum of 101 GB HDD for root filesystem required" >&2
+            if [ -n "$2" ] && [ "${2}" -lt 110  ]; then
+                echo "Error: Minimum of 110 GB HDD for root filesystem required" >&2
                 exit 1       
             elif [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
                 VM_DISK_DATA=$2
@@ -274,7 +280,11 @@ while (( "$#" )); do
                 echo "Error: Argument for $1 is missing" >&2
                 exit 1
             fi
-            ;;           
+            ;;
+        --vm-cleanup)
+                VM_CLEANUP=1
+                shift
+                ;;        
         --assume-yes)
                 ASSUME_YES=1
                 shift
@@ -300,19 +310,48 @@ function distro_check {
     if [ -f "/etc/redhat-release" ]; then
         DISTRO=$(gawk 'match($0, /.*^ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
         VERSION=$(gawk 'match($0, /.*^VERSION_ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
-        if [ "$DISTRO" = "centos" ]; then
-            if [ "$VERSION" = "8" ]; then
+        if [ "${DISTRO}" = "centos" ]; then
+            if [ "${VERSION}" = "7" ]; then
                 echo "[DEPLOYER] Detected $DISTRO $VERSION"
-                DETECTED_DISTRO=rhel8
+                DETECTED_DISTRO=rhel79
                 if [ -f "/usr/bin/nmcli" ]; then
                     DETECTED_METHOD=nmcli
                 else
                     echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
-                fi
+                fi      
+            elif [ "${VERSION}" = "8" ] | [ "${VERSION}" = "8.3" ]; then
+                echo "[DEPLOYER] Detected $DISTRO $VERSION"
+                DETECTED_DISTRO=rhel83
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
+                fi 
             else
                 echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
                 exit 1
             fi
+        elif [ "${DISTRO}" = "rhel" ]; then
+            if [ "${VERSION}" = "7.9" ]; then
+                echo "[DEPLOYER] Detected $DISTRO $VERSION"
+                DETECTED_DISTRO=rhel79
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
+                fi    
+            elif [ "${VERSION}" = "8.3" ]; then
+                echo "[DEPLOYER] Detected $DISTRO $VERSION"
+                DETECTED_DISTRO=rhel83
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
+                fi        
+            else
+                echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
+                exit 1
+            fi        
         else
             echo "[DEPLOYER] Unsupported distro (Detected $DISTRO)"
             exit 1
@@ -329,13 +368,25 @@ function init {
     mkdir -p /tmp/cvp/cloudvision
 }
 
-function deps_rhel8 {
+function deps_rhel79 {
+    yum install -y libvirt virt-install libvirt-daemon-kvm rsync
+    systemctl enable libvirtd
+    systemctl start libvirtd
+}
+
+function deps_rhel83 {
     dnf install -y libvirt virt-install libvirt-daemon-kvm rsync
     systemctl enable libvirtd
     systemctl start libvirtd
 }
 
-function deps_rhel8_cloudvision_download {
+function deps_rhel79_cloudvision_download {
+    yum install -y python3
+    python3 -m pip install --upgrade pip
+    python3 -m pip install scp paramiko tqdm requests
+}
+
+function deps_rhel83_cloudvision_download {
     dnf install -y python3
     python3 -m pip install --upgrade pip
     python3 -m pip install scp paramiko tqdm requests
@@ -345,22 +396,106 @@ function deps_rhel8_cloudvision_download {
 # == Network configuration 
 # ===========================================================================================
 
-function network_rhel8_network_nmcli {
+function network_rhel79_network_nmcli {
     if [ $(nmcli -t con show | grep $LIBVIRT_BRIDGE | wc -l) -ge 1 ]; then
         nmcli con delete $LIBVIRT_BRIDGE
     fi
     if [ "${HOST_NIC}" != "${LIBVIRT_NIC}" ]; then
-        for interface in $(nmcli -t -f NAME,UUID,DEVICE con show | grep $LIBVIRT_NIC | cut -d ":" -f 2 ); do
-            nmcli con delete $interface
+        for UUID in $(nmcli -t -f NAME,UUID,DEVICE con show | grep $LIBVIRT_NIC | cut -d ":" -f 2 ); do
+            nmcli con delete $UUID
         done
     fi
-    for interface in $(nmcli -t -f UUID con show); do
-        for bridge in $(nmcli -t -f connection.master con show $interface | cut -d ":" -f 2 ); do
-            if [ "${bridge}" == "${LIBVIRT_BRIDGE}" ]; then
-                if [ "${interface}" == "${HOST_NIC}" ]; then
-                    nmcli con modify $interface -connection.master "" -connection.slave-type ""
+    for CONNECTIONS in $(nmcli -t -f UUID,DEVICE con show); do
+        UUID=$(echo $CONNECTIONS | cut -d ":" -f 1)
+        INTERFACE=$(echo $CONNECTIONS | cut -d ":" -f 2)
+        for BRIDGE in $(nmcli -t -f connection.master con show $UUID | cut -d ":" -f 2 ); do
+            if [ "${BRIDGE}" == "${LIBVIRT_BRIDGE}" ]; then
+                if [ "${INTERFACE}" == "${HOST_NIC}" ]; then
+                    nmcli con modify $UUID -connection.master "" -connection.slave-type ""
                 else
-                    nmcli con delete $interface
+                    nmcli con delete $UUID
+                fi
+            fi
+        done
+    done
+
+    echo "[DEPLOYER] Create libvirt bridge $LIBVIRT_BRIDGE"
+    nmcli con add ifname $LIBVIRT_BRIDGE type bridge con-name $LIBVIRT_BRIDGE
+    nmcli con modify $LIBVIRT_BRIDGE bridge.stp no
+    nmcli con modify $LIBVIRT_BRIDGE connection.autoconnect yes
+
+    if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
+        echo "[DEPLOYER] Applying hypervisor IPv4 configuration to $LIBVIRT_BRIDGE"
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses $HOST_IP
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.gateway $HOST_GW
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.dns $HOST_DNS
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.method manual
+        nmcli con modify $LIBVIRT_BRIDGE ipv6.method ignore
+        if [ -n "${HOST_VLAN}" ] && [ "${HOST_VLAN}" == "${LIBVIRT_VLAN}" ]; then
+            echo "[DEPLOYER] Adding host VLAN $HOST_VLAN to $LIBVIRT_BRIDGE"
+            nmcli con mod $LIBVIRT_BRIDGE bridge.vlan-filtering yes
+            nmcli con mod $LIBVIRT_BRIDGE bridge.vlan-default-pvid $HOST_VLAN
+            nmcli con mod $LIBVIRT_BRIDGE bridge.vlans $HOST_VLAN            
+            nmcli con add type vlan con-name $HOST_NIC.$HOST_VLAN dev $HOST_NIC id $HOST_VLAN master $LIBVIRT_BRIDGE
+            nmcli con mod ens32 -ipv4.addresses "" -ipv4.gateway "" -ipv4.dns "" ipv4.method disabled
+        else
+            echo "[DEPLOYER] Adding host NIC $HOST_NIC to $LIBVIRT_BRIDGE"
+            nmcli con mod $HOST_NIC connection.master $LIBVIRT_BRIDGE connection.slave-type bridge
+        fi
+    else
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.method disabled
+        nmcli con modify $LIBVIRT_BRIDGE ipv6.method ignore
+        if [ -n "${LIBVIRT_VLAN}" ]; then
+            echo "[DEPLOYER] Adding libvirt VLAN $LIBVIRT_VLAN to $LIBVIRT_BRIDGE"       
+            nmcli con add type vlan con-name $LIBVIRT_NIC.$LIBVIRT_VLAN dev $LIBVIRT_NIC id $LIBVIRT_VLAN master $LIBVIRT_BRIDGE
+            nmcli con mod $LIBVIRT_BRIDGE bridge.vlan-filtering yes
+            nmcli con mod $LIBVIRT_BRIDGE bridge.vlan-default-pvid $LIBVIRT_VLAN
+            nmcli con mod $LIBVIRT_BRIDGE bridge.vlans $LIBVIRT_VLAN  
+        else
+            echo "[DEPLOYER] Adding libvirt NIC $LIBVIRT_NIC to $LIBVIRT_BRIDGE"
+            if [ $(nmcli -t con show | grep $LIBVIRT_NIC | wc -l) == 0 ]; then
+                nmcli con add ifname $LIBVIRT_NIC type ethernet con-name $LIBVIRT_NIC
+                nmcli con modify $LIBVIRT_NIC ipv4.method disabled
+                nmcli con modify $LIBVIRT_NIC ipv6.method ignore
+            fi
+            nmcli con modify $LIBVIRT_NIC connection.master $LIBVIRT_BRIDGE connection.slave-type bridge
+        fi
+    fi
+    nmcli con up $LIBVIRT_BRIDGE
+    if [ -f "${LIBVIRT_VLAN}" ]; then
+        nmcli con up $LIBVIRT_NIC.$LIBVIRT_VLAN
+    fi
+    if [ -f "${HOST_VLAN}" ]; then
+        nmcli con up $HOST_NIC.$HOST_VLAN
+    fi
+    if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
+        nmcli con up $HOST_NIC
+    else
+        nmcli con up $HOST_NIC
+        if [ -f "${LIBVIRT_VLAN}" ]; then     
+            nmcli con up $LIBVIRT_NIC
+        fi
+    fi
+}
+
+function network_rhel83_network_nmcli {
+    if [ $(nmcli -t con show | grep $LIBVIRT_BRIDGE | wc -l) -ge 1 ]; then
+        nmcli con delete $LIBVIRT_BRIDGE
+    fi
+    if [ "${HOST_NIC}" != "${LIBVIRT_NIC}" ]; then
+        for UUID in $(nmcli -t -f NAME,UUID,DEVICE con show | grep $LIBVIRT_NIC | cut -d ":" -f 2 ); do
+            nmcli con delete $UUID
+        done
+    fi
+    for CONNECTIONS in $(nmcli -t -f UUID,DEVICE con show); do
+        UUID=$(echo $CONNECTIONS | cut -d ":" -f 1)
+        INTERFACE=$(echo $CONNECTIONS | cut -d ":" -f 2)
+        for BRIDGE in $(nmcli -t -f connection.master con show $UUID | cut -d ":" -f 2 ); do
+            if [ "${BRIDGE}" == "${LIBVIRT_BRIDGE}" ]; then
+                if [ "${INTERFACE}" == "${HOST_NIC}" ]; then
+                    nmcli con modify $UUID -connection.master "" -connection.slave-type ""
+                else
+                    nmcli con delete $UUID
                 fi
             fi
         done
@@ -433,7 +568,7 @@ function centos_download {
     CENTOS=/tmp/cvp/centos/centos.iso
     CENTOS_DOWNLOAD=1
     mkdir -p /tmp/cvp/centos
-    if [ -f "/tmp/cvp/centos/centos.iso" ] && [ ! -n "${ASSUME_YES}" ]; then
+    if [ -f "/tmp/cvp/centos/centos.iso" ] && [ -z "${ASSUME_YES}" ]; then
         while true; do
             read -p "[DEPLOYER] CentOS image already found. Do you want to re-download? (yes/no) " yn
             case $yn in
@@ -481,7 +616,7 @@ function centos_check {
 function cloudvision_download {
     CLOUDVISION=/tmp/cvp/cloudvision/cvp-rpm-installer-$CLOUDVISION_VERSION
     CLOUDVISION_DOWNLOAD=1
-    if [ -f "${CLOUDVISION}" ] && [ -f "${ASSUME_YES}" ]; then
+    if [ -f "${CLOUDVISION}" ] && [ -n "${ASSUME_YES}" ]; then
         rm -Rf /tmp/cvp/cloudvision/cvp-rpm-installer-$CLOUDVISION_VERSION
     elif [ -f "${CLOUDVISION}" ]; then
         while true; do
@@ -668,7 +803,7 @@ function vm_install {
 function vm_cleanup {
     virsh destroy $LIBVIRT_VMNAME
     virsh undefine $LIBVIRT_VMNAME
-    rm -Rf $LIBVIRT_IMAGES/$LIBVIRT_VMNAME.root.img $LIBVIRT_IMAGES/images/$LIBVIRT_VMNAME.data.img
+    rm -Rf $LIBVIRT_IMAGES/$LIBVIRT_VMNAME.root.img $LIBVIRT_IMAGES/$LIBVIRT_VMNAME.data.img
 }
 
 function cleanup {
@@ -680,6 +815,11 @@ function cleanup {
 # ===========================================================================================
 
 distro_check
+
+if [ -n "${VM_CLEANUP}" ]; then
+    vm_cleanup
+    exit 0
+fi
 
 if [ "${NETWORK}" == 1 ] && [ "${VM}" == 1 ]; then
     echo "[DEPLOYER] Error: Network configuration and VM setup cannot be conducted at the same time."
