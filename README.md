@@ -24,6 +24,16 @@ The installation is fully automated and parameterized. It can either use local a
 
 ## Parameters
 
+### Credentials
+
+| Username       | Password |
+|----------------|----------|
+| root           | cvpadmin |
+
+<span style="color:red">**IMPORTANT**</span>
+
+Please change root password after first boot!
+
 ### Network Configuration
 | Option             | Parameter         | Example         | Required | Description                                                                                              |
 |--------------------|-------------------|-----------------|----------|----------------------------------------------------------------------------------------------------------|
