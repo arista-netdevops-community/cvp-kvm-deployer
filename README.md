@@ -37,7 +37,7 @@ The installation is fully automated and parameterized. It can either use local a
 | `--libvirt-bridge` | Device name       | cvpbr0          | No       | Name of bridge for CVP VM <br> (default: `cvpbr0`)                                                       |
 | `--libvirt-vlan`   | VLAN ID           | 1000            | No       | Tagged VLAN for `--host-nic` <br>(default: untagged)                                                     |
 
-**IMPORTANT**
+<span style="color:red">**IMPORTANT**</span>
 
 The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-nic` are identical! Otherwise only libvirt-related configuration will be taken into account.
 
