@@ -53,18 +53,21 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
 
 **Example**
 
-    ./deploy.sh --network \
+    ./deploy.sh 
+        --network \
         --host-nic ens192 \
         --host-ip 192.168.0.10/24 \
         --host-gw 192.168.0.1 \
         --host-dns 1.1.1.1 \
         --libvirt-nic ens192
 
-    ./deploy.sh --network \
+    ./deploy.sh 
+        --network \
         --host-nic ens32 \
         --libvirt-nic ens160
 
-    ./deploy.sh --network \
+    ./deploy.sh 
+        --network \
         --host-nic ens32 \
         --host-ip 192.168.0.10/24 \
         --host-gw 192.168.0.1 \
@@ -73,7 +76,8 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
         --libvirt-nic ens32 \
         --libvirt-vlan 1000
 
-    ./deploy.sh --network \
+    ./deploy.sh 
+        --network \
         --host-nic ens32 \
         --libvirt-nic ens160
         --libvirt-vlan 1000
@@ -100,7 +104,8 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
 
 **Example**
 
-    ./deploy.sh --vm \
+    ./deploy.sh 
+        --vm \
         --centos download \
         --cloudvision download \
         --version 2020.3.0 \
@@ -115,7 +120,8 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
         --vm-dns 192.168.0.11 \
         --vm-ntp pool.ntp.org
 
-    ./deploy.sh --vm \
+    ./deploy.sh 
+        --vm \
         --centos /tmp/CentOS-7-x86_64-Minimal-1908.iso \
         --cloudvision download \
         --version 2020.3.0 \
@@ -130,7 +136,8 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
         --vm-dns 192.168.0.11 \
         --vm-ntp pool.ntp.org
 
-    ./deploy.sh --vm \
+    ./deploy.sh 
+        --vm \
         --centos /tmp/CentOS-7-x86_64-Minimal-1908.iso \
         --cloudvision /tmp/cvp-rpm-installer-2020.3.0 \
         --cpu 8 \
@@ -142,3 +149,12 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
         --vm-gw 192.168.0.1 \
         --vm-dns 192.168.0.11 \
         --vm-ntp pool.ntp.org
+
+| Option             | Parameter                | Example                         | Required | Description                                                                       |
+|--------------------|--------------------------|---------------------------------|----------|-----------------------------------------------------------------------------------|
+| `--vm-cleanup`     |                          |                                 | Yes      | Deletes disk files and removes VM                                                 | 
+
+**Example**
+
+    ./deploy.sh
+        --vm-cleanup
