@@ -314,19 +314,25 @@ function distro_check {
             if [ "${VERSION}" = "7" ]; then
                 echo "[DEPLOYER] Detected $DISTRO $VERSION"
                 DETECTED_DISTRO=rhel79
-                if [ -f "/usr/bin/nmcli" ]; then
-                    DETECTED_METHOD=nmcli
-                else
-                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
-                fi      
+                 if [ -n "${NETWORK}" ]; then
+                    if [ -f "/usr/bin/nmcli" ]; then
+                        DETECTED_METHOD=nmcli
+                    else
+                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                        exit 1 
+                    fi
+                fi
             elif [ "${VERSION}" = "8" ] | [ "${VERSION}" = "8.3" ]; then
                 echo "[DEPLOYER] Detected $DISTRO $VERSION"
                 DETECTED_DISTRO=rhel83
-                if [ -f "/usr/bin/nmcli" ]; then
-                    DETECTED_METHOD=nmcli
-                else
-                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
-                fi 
+                 if [ -n "${NETWORK}" ]; then
+                    if [ -f "/usr/bin/nmcli" ]; then
+                        DETECTED_METHOD=nmcli
+                    else
+                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                        exit 1 
+                    fi
+                fi
             else
                 echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
                 exit 1
@@ -335,19 +341,25 @@ function distro_check {
             if [ "${VERSION}" = "7.9" ]; then
                 echo "[DEPLOYER] Detected $DISTRO $VERSION"
                 DETECTED_DISTRO=rhel79
-                if [ -f "/usr/bin/nmcli" ]; then
-                    DETECTED_METHOD=nmcli
-                else
-                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
-                fi    
+                 if [ -n "${NETWORK}" ]; then
+                    if [ -f "/usr/bin/nmcli" ]; then
+                        DETECTED_METHOD=nmcli
+                    else
+                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                        exit 1 
+                    fi
+                fi
             elif [ "${VERSION}" = "8.3" ]; then
                 echo "[DEPLOYER] Detected $DISTRO $VERSION"
                 DETECTED_DISTRO=rhel83
-                if [ -f "/usr/bin/nmcli" ]; then
-                    DETECTED_METHOD=nmcli
-                else
-                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)" 
-                fi        
+                 if [ -n "${NETWORK}" ]; then
+                    if [ -f "/usr/bin/nmcli" ]; then
+                        DETECTED_METHOD=nmcli
+                    else
+                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                        exit 1 
+                    fi
+                fi    
             else
                 echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
                 exit 1
