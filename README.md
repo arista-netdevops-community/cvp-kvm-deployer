@@ -9,12 +9,13 @@ The installation is fully automated and parameterized. It can either use local a
 ## Compatibility
 
 ### Host Operating System
-| Distribution             | Version |
-|--------------------------|---------|
-| CentOS                   | 7.9     |
-| CentOS                   | 8.3     |
-| Red Hat Enterprise Linux | 7.9     |
-| Red Hat Enterprise Linux | 8.3     |
+| Distribution             | Version     |
+|--------------------------|-------------|
+| CentOS                   | 7.9         |
+| CentOS                   | 8.3         |
+| Debian                   | 10 (buster) |
+| Red Hat Enterprise Linux | 7.9         |
+| Red Hat Enterprise Linux | 8.3         |
 
 ### CloudVision Portal
 | Product                  | Version  |
@@ -39,9 +40,9 @@ Please change root password after first boot!
 |--------------------|-------------------|-----------------|----------|----------------------------------------------------------------------------------------------------------|
 | `--network`        |                   |                 | Yes      | Enables network configuration mode                                                                       |        
 | `--host-nic`       | Device name       | ens192          | Yes      | NIC of the hypervisor (management)                                                                       |
-| `--host-ip`        | IPv4 address/CIDR | 192.168.0.10/24 | No       | IP of the hypervisor (management) <br> (only if `--host-nic` and `--libvirt-nic` are identical)          |
-| `--host-gw`        | IPv4 address      | 192.168.0.1     | No       | Gateway of the hypervisor (management)<br> (only if `--host-nic` and `--libvirt-nic` are identical)      |
-| `--host-dns`       | IPv4 address      | 192.168.0.1     | No       | Name server of the hypervisor (management) <br> (only if `--host-nic` and `--libvirt-nic` are identical) |
+| `--ip`             | IPv4 address/CIDR | 192.168.0.10/24 | No       | IP of the hypervisor (management) <br> (only if `--host-nic` and `--libvirt-nic` are identical)          |
+| `--gw`             | IPv4 address      | 192.168.0.1     | No       | Gateway of the hypervisor (management)<br> (only if `--host-nic` and `--libvirt-nic` are identical)      |
+| `--dns`            | IPv4 address      | 192.168.0.1     | No       | Name server of the hypervisor (management) <br> (only if `--host-nic` and `--libvirt-nic` are identical) |
 | `--host-vlan`      | VLAN ID           | 2000            | No       | Tagged VLAN for `--host-nic` <br>(default: untagged)                                                     |
 | `--libvirt-nic`    | Device name       | ens192          | Yes      | NIC used to bridge CVP VM <br>(can be identical to `--host-nic`)                                         |
 | `--libvirt-bridge` | Device name       | cvpbr0          | No       | Name of bridge for CVP VM <br> (default: `cvpbr0`)                                                       |
@@ -56,9 +57,9 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
     ./deploy.sh 
         --network \
         --host-nic ens192 \
-        --host-ip 192.168.0.10/24 \
-        --host-gw 192.168.0.1 \
-        --host-dns 1.1.1.1 \
+        --ip 192.168.0.10/24 \
+        --gw 192.168.0.1 \
+        --dns 1.1.1.1 \
         --libvirt-nic ens192
 
     ./deploy.sh 
@@ -69,9 +70,9 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
     ./deploy.sh 
         --network \
         --host-nic ens32 \
-        --host-ip 192.168.0.10/24 \
-        --host-gw 192.168.0.1 \
-        --host-dns 1.1.1.1 \
+        --ip 192.168.0.10/24 \
+        --gw 192.168.0.1 \
+        --dns 1.1.1.1 \
         --host-vlan 1000 \
         --libvirt-nic ens32 \
         --libvirt-vlan 1000
@@ -97,10 +98,10 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
 | `--rootsize`       |  VM disk size in GB      | 50                              | Yes      | Disk size for root file system <br> (Minimum: 35)                                 | 
 | `--datasize`       |  VM disk size in GB      | 700                             | Yes      | Disk size for data file system <br> (Minimum: 110)                                | 
 | `--vm-fqdn`        |  Hostname + domain name  | cvp.test.local                  | Yes      | Hostname + domain name for CVP VM                                                 | 
-| `--vm-ip`          |  IP address/CIDR         | 192.168.0.11/24                 | Yes      | IP address of CVP VM                                                              | 
-| `--vm-gw`          |  IP address              | 192.168.0.1                     | Yes      | Gateway of CVP VM                                                                 | 
-| `--vm-dns`         |  IP address              | 192.168.0.1                     | Yes      | Name server of CVP VM                                                             | 
-| `--vm-ntp`         |  IP address/FQDN         | pool.ntp.org                    | Yes      | NTP server of CVP VM                                                              | 
+| `--ip`             |  IP address/CIDR         | 192.168.0.11/24                 | Yes      | IP address of CVP VM                                                              | 
+| `--gw`             |  IP address              | 192.168.0.1                     | Yes      | Gateway of CVP VM                                                                 | 
+| `--dns`            |  IP address              | 192.168.0.1                     | Yes      | Name server of CVP VM                                                             | 
+| `--ntp`            |  IP address/FQDN         | pool.ntp.org                    | Yes      | NTP server of CVP VM                                                              | 
 
 **Example**
 
@@ -115,10 +116,10 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
         --rootsize 35 \
         --datasize 110 \
         --vm-fqdn cvp.test.local \
-        --vm-ip 192.168.0.11/24 \
-        --vm-gw 192.168.0.1 \
-        --vm-dns 192.168.0.11 \
-        --vm-ntp pool.ntp.org
+        --ip 192.168.0.11/24 \
+        --gw 192.168.0.1 \
+        --dns 192.168.0.11 \
+        --ntp pool.ntp.org
 
     ./deploy.sh 
         --vm \
@@ -131,10 +132,10 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
         --rootsize 50 \
         --datasize 110 \
         --vm-fqdn cvp.test.local \
-        --vm-ip 192.168.0.11/24 \
-        --vm-gw 192.168.0.1 \
-        --vm-dns 192.168.0.11 \
-        --vm-ntp pool.ntp.org
+        --ip 192.168.0.11/24 \
+        --gw 192.168.0.1 \
+        --dns 192.168.0.11 \
+        --ntp pool.ntp.org
 
     ./deploy.sh 
         --vm \
@@ -145,10 +146,10 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
         --rootsize 50 \
         --datasize 110 \
         --vm-fqdn cvp.test.local \
-        --vm-ip 192.168.0.11/24 \
-        --vm-gw 192.168.0.1 \
-        --vm-dns 192.168.0.11 \
-        --vm-ntp pool.ntp.org
+        --ip 192.168.0.11/24 \
+        --gw 192.168.0.1 \
+        --dns 192.168.0.11 \
+        --ntp pool.ntp.org
 
 | Option             | Parameter                | Example                         | Required | Description                                                                       |
 |--------------------|--------------------------|---------------------------------|----------|-----------------------------------------------------------------------------------|

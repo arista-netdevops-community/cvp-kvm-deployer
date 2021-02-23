@@ -14,9 +14,9 @@
 # ./deploy.sh \
 #   --network
 #   --host-nic <Host NIC> \
-#   --host-ip <Host IP plus CIDR - only required if '--host_nic' and '--libvirt_nic are the same'> \
-#   --host-gw <Host gateway - only required if '--host_nic' and '--libvirt_nic are the same'> \
-#   --host-dns <Host DNS server - only required if '--host_nic' and '--libvirt_nic are the same'> \
+#   --ip <Host IP plus CIDR - only required if '--host_nic' and '--libvirt_nic are the same'> \
+#   --gw <Host gateway - only required if '--host_nic' and '--libvirt_nic are the same'> \
+#   --dns <Host DNS server - only required if '--host_nic' and '--libvirt_nic are the same'> \
 #   --host-vlan <optional - Host VLAN (tagged) on Host NIC>
 #   --libvirt-nic <NIC for libvirt use> \
 #   --libvirt-bridge <optional - (default: 'cvpbr0') - Bridge for libvirt use (do not use 'virbr0')> \
@@ -35,10 +35,10 @@
 #   --rootsize <Amount of root filesystem in GB - minimum 35> \
 #   --datasize <Amount of data filesystem in GB - minimum 110> \
 #   --vm-fqdn <CVP hostname plus full qualified domain name> \
-#   --vm-ip <CVP IP + CIDR> \
-#   --vm-gw <CVP gateway> \
-#   --vm-dns <CVP DNS> \
-#   --vm-ntp <CVP NTP>
+#   --ip <CVP IP + CIDR> \
+#   --gw <CVP gateway> \
+#   --dns <CVP DNS> \
+#   --ntp <CVP NTP>
 # ===========================================================================================
 # == Usage (CVP VM - Cleanup for reinstall)
 # ./deploy.sh \
@@ -77,33 +77,6 @@ while (( "$#" )); do
         --host-nic)
             if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
                 HOST_NIC=$2
-                shift 2
-            else
-                echo "Error: Argument for $1 is missing" >&2
-                exit 1
-            fi
-            ;;
-        --host-ip)
-            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-                HOST_IP=$2
-                shift 2
-            else
-                echo "Error: Argument for $1 is missing" >&2
-                exit 1
-            fi
-            ;; 
-        --host-gw)
-            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-                HOST_GW=$2
-                shift 2
-            else
-                echo "Error: Argument for $1 is missing" >&2
-                exit 1
-            fi
-            ;; 
-        --host-dns)
-            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-                HOST_DNS=$2
                 shift 2
             else
                 echo "Error: Argument for $1 is missing" >&2
@@ -243,42 +216,42 @@ while (( "$#" )); do
                 exit 1
             fi
             ;;
-        --vm-ip)
+        --ip)
             if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-                VM_IP=$(echo $2 | cut -f1 -d'/')
-                VM_CIDR=$(echo $2 | cut -f2 -d'/')
-                if [ ${#VM_CIDR} != "2" ]; then
+                IP=$(echo $2 | cut -f1 -d'/')
+                CIDR=$(echo $2 | cut -f2 -d'/')
+                if [ ${#CIDR} != "2" ]; then
                     echo "Error: No CIDR for $1 is specified." >&2
                     exit 1
                 fi
-                VM_NETMASK=$(cidr_to_netmask ${VM_CIDR})
+                NETMASK=$(cidr_to_netmask ${CIDR})
                 shift 2
             else
                 echo "Error: Argument for $1 is missing" >&2
                 exit 1
             fi
             ;;
-        --vm-gw)
+        --gw)
             if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-                VM_GW=$2
+                GW=$2
                 shift 2
             else
                 echo "Error: Argument for $1 is missing" >&2
                 exit 1
             fi
             ;;
-        --vm-dns)
+        --dns)
             if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-                VM_DNS=$2
+                DNS=$2
                 shift 2
             else
                 echo "Error: Argument for $1 is missing" >&2
                 exit 1
             fi
             ;;
-        --vm-ntp)
+        --ntp)
             if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
-                VM_NTP=$2
+                NTP=$2
                 shift 2
             else
                 echo "Error: Argument for $1 is missing" >&2
@@ -311,68 +284,96 @@ eval set -- "$PARAMS"
 # ===========================================================================================
 
 function distro_check {
-    if [ -f "/etc/redhat-release" ]; then
-        DISTRO=$(gawk 'match($0, /.*^ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
-        VERSION=$(gawk 'match($0, /.*^VERSION_ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
-        if [ "${DISTRO}" = "centos" ]; then
-            if [ "${VERSION}" = "7" ]; then
-                echo "[DEPLOYER] Detected $DISTRO $VERSION"
-                DETECTED_DISTRO=rhel79
-                 if [ -n "${NETWORK}" ]; then
-                    if [ -f "/usr/bin/nmcli" ]; then
-                        DETECTED_METHOD=nmcli
-                    else
-                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
-                        exit 1 
-                    fi
+    #DISTRO=$(awk 'match($0, /.*^ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
+    #VERSION=$(awk 'match($0, /.*^VERSION_ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
+    DISTRO=$(awk -F= '$1=="ID" { print $2 ;}' /etc/os-release)
+    VERSION=$(awk -F= '$1=="VERSION_ID" { print $2 ;}' /etc/os-release | tr -d '"')
+    if [ "${DISTRO}" = "centos" ]; then
+        if [ "${VERSION}" = "7" ]; then
+            echo "[DEPLOYER] Detected $DISTRO $VERSION"
+            DETECTED_DISTRO=rhel79
+            if [ -n "${NETWORK}" ]; then
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                    exit 1 
                 fi
-            elif [ "${VERSION}" = "8" ] | [ "${VERSION}" = "8.3" ]; then
-                echo "[DEPLOYER] Detected $DISTRO $VERSION"
-                DETECTED_DISTRO=rhel83
-                 if [ -n "${NETWORK}" ]; then
-                    if [ -f "/usr/bin/nmcli" ]; then
-                        DETECTED_METHOD=nmcli
-                    else
-                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
-                        exit 1 
-                    fi
-                fi
-            else
-                echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
-                exit 1
             fi
-        elif [ "${DISTRO}" = "rhel" ]; then
-            if [ "${VERSION}" = "7.9" ]; then
-                echo "[DEPLOYER] Detected $DISTRO $VERSION"
-                DETECTED_DISTRO=rhel79
-                 if [ -n "${NETWORK}" ]; then
-                    if [ -f "/usr/bin/nmcli" ]; then
-                        DETECTED_METHOD=nmcli
-                    else
-                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
-                        exit 1 
-                    fi
+        elif [ "${VERSION}" = "8" ] | [ "${VERSION}" = "8.3" ]; then
+            echo "[DEPLOYER] Detected $DISTRO $VERSION"
+            DETECTED_DISTRO=rhel83
+                if [ -n "${NETWORK}" ]; then
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                    exit 1 
                 fi
-            elif [ "${VERSION}" = "8.3" ]; then
-                echo "[DEPLOYER] Detected $DISTRO $VERSION"
-                DETECTED_DISTRO=rhel83
-                 if [ -n "${NETWORK}" ]; then
-                    if [ -f "/usr/bin/nmcli" ]; then
-                        DETECTED_METHOD=nmcli
-                    else
-                        echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
-                        exit 1 
-                    fi
-                fi    
-            else
-                echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
-                exit 1
-            fi        
+            fi
         else
-            echo "[DEPLOYER] Unsupported distro (Detected $DISTRO)"
+            echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
             exit 1
         fi
-    fi    
+    elif [ "${DISTRO}" = "rhel" ]; then
+        if [ "${VERSION}" = "7.9" ]; then
+            echo "[DEPLOYER] Detected $DISTRO $VERSION"
+            DETECTED_DISTRO=rhel79
+            if [ -n "${NETWORK}" ]; then
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                    exit 1 
+                fi
+            fi
+        elif [ "${VERSION}" = "8.3" ]; then
+            echo "[DEPLOYER] Detected $DISTRO $VERSION"
+            DETECTED_DISTRO=rhel83
+            if [ -n "${NETWORK}" ]; then
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                    exit 1 
+                fi
+            fi    
+        else
+            echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
+            exit 1
+        fi        
+    elif [ "${DISTRO}" = "debian" ]; then
+        if [ "${VERSION}" = "10" ]; then
+            echo "[DEPLOYER] Detected $DISTRO $VERSION"
+            DETECTED_DISTRO=debian10
+            if [ -n "${NETWORK}" ]; then
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Changing network configuration to 'network-manager'"
+                    apt install -y network-manager
+                    sed s/'managed=false/managed=true'/g < /etc/NetworkManager/NetworkManager.conf > /etc/NetworkManager/NetworkManager.conf.changed
+                    mv /etc/NetworkManager/NetworkManager.conf.changed /etc/NetworkManager/NetworkManager.conf
+                    systemctl restart network-manager
+                    for CONNECTIONS in $(nmcli -t -f UUID,DEVICE con show); do
+                        UUID=$(echo $CONNECTIONS | cut -d ":" -f 1)
+                        INTERFACE=$(echo $CONNECTIONS | cut -d ":" -f 2)
+                        if [ "${INTERFACE}" == "" ]; then
+                            nmcli con delete $UUID
+                        fi
+                    done
+                    echo "[DEPLOYER] Transition to 'network-manager' completed."
+                    DETECTED_METHOD=nmcli
+                fi
+            fi
+        else
+            echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
+            exit 1
+        fi       
+    else
+        echo "[DEPLOYER] Unsupported distro (Detected $DISTRO)"
+        exit 1
+    fi
 }
 
 function init {
@@ -384,16 +385,34 @@ function init {
     mkdir -p /tmp/cvp/cloudvision
 }
 
+# ===========================================================================================
+# == Host OS related functions - Debian 10
+# ===========================================================================================
+
+function deps_debian10 {
+    apt install -y --no-install-recommends curl libvirt-daemon libvirt-clients qemu-system libvirt-clients libvirt-daemon-system rsync virtinst libosinfo-bin
+    KVM_OSVARIANT=rhel7.6
+}
+
+function deps_debian10_cloudvision_download {
+    apt install -y python3 python3-pip
+    python3 -m pip install --upgrade pip
+    python3 -m pip install scp paramiko tqdm requests
+}
+
+function network_debian10_network_nmcli {
+    network_rhel79_network_nmcli
+}
+
+# ===========================================================================================
+# == Host OS related functions - Red Hat Enterprise Linux/CentOS 7.9
+# ===========================================================================================
+
 function deps_rhel79 {
     yum install -y libvirt virt-install libvirt-daemon-kvm rsync
     systemctl enable libvirtd
     systemctl start libvirtd
-}
-
-function deps_rhel83 {
-    dnf install -y libvirt virt-install libvirt-daemon-kvm rsync
-    systemctl enable libvirtd
-    systemctl start libvirtd
+    KVM_OSVARIANT=rhel7.7
 }
 
 function deps_rhel79_cloudvision_download {
@@ -401,16 +420,6 @@ function deps_rhel79_cloudvision_download {
     python3 -m pip install --upgrade pip
     python3 -m pip install scp paramiko tqdm requests
 }
-
-function deps_rhel83_cloudvision_download {
-    dnf install -y python3
-    python3 -m pip install --upgrade pip
-    python3 -m pip install scp paramiko tqdm requests
-}
-
-# ===========================================================================================
-# == Network configuration 
-# ===========================================================================================
 
 function network_rhel79_network_nmcli {
     if [ $(nmcli -t con show | grep $LIBVIRT_BRIDGE | wc -l) -ge 1 ]; then
@@ -442,9 +451,9 @@ function network_rhel79_network_nmcli {
 
     if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
         echo "[DEPLOYER] Applying hypervisor IPv4 configuration to $LIBVIRT_BRIDGE"
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses $HOST_IP
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.gateway $HOST_GW
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.dns $HOST_DNS
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses $IP
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.gateway $GW
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.dns $DNS
         nmcli con modify $LIBVIRT_BRIDGE ipv4.method manual
         nmcli con modify $LIBVIRT_BRIDGE ipv6.method ignore
         if [ -n "${HOST_VLAN}" ] && [ "${HOST_VLAN}" == "${LIBVIRT_VLAN}" ]; then
@@ -456,6 +465,11 @@ function network_rhel79_network_nmcli {
             nmcli con mod ens32 -ipv4.addresses "" -ipv4.gateway "" -ipv4.dns "" ipv4.method disabled
         else
             echo "[DEPLOYER] Adding host NIC $HOST_NIC to $LIBVIRT_BRIDGE"
+            if [ $(nmcli -t con show | grep $HOST_NIC | wc -l) == 0 ]; then
+                nmcli con add ifname $HOST_NIC type ethernet con-name $HOST_NIC
+                nmcli con modify $HOST_NIC ipv4.method disabled
+                nmcli con modify $HOST_NIC ipv6.method ignore
+            fi
             nmcli con mod $HOST_NIC connection.master $LIBVIRT_BRIDGE connection.slave-type bridge
         fi
     else
@@ -477,6 +491,7 @@ function network_rhel79_network_nmcli {
             nmcli con modify $LIBVIRT_NIC connection.master $LIBVIRT_BRIDGE connection.slave-type bridge
         fi
     fi
+    echo "[DEPLOYER] Activating network configuration - you might lose connectivity for up to 20 seconds"
     nmcli con up $LIBVIRT_BRIDGE
     if [ -f "${LIBVIRT_VLAN}" ]; then
         nmcli con up $LIBVIRT_NIC.$LIBVIRT_VLAN
@@ -492,6 +507,23 @@ function network_rhel79_network_nmcli {
             nmcli con up $LIBVIRT_NIC
         fi
     fi
+}
+
+# ===========================================================================================
+# == Host OS related functions - Red Hat Enterprise Linux/CentOS 8.3
+# ===========================================================================================
+
+function deps_rhel83 {
+    dnf install -y libvirt virt-install libvirt-daemon-kvm rsync
+    systemctl enable libvirtd
+    systemctl start libvirtd
+    KVM_OSVARIANT=rhel7.7
+}
+
+function deps_rhel83_cloudvision_download {
+    dnf install -y python3
+    python3 -m pip install --upgrade pip
+    python3 -m pip install scp paramiko tqdm requests
 }
 
 function network_rhel83_network_nmcli {
@@ -524,9 +556,9 @@ function network_rhel83_network_nmcli {
 
     if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
         echo "[DEPLOYER] Applying hypervisor IPv4 configuration to $LIBVIRT_BRIDGE"
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses $HOST_IP
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.gateway $HOST_GW
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.dns $HOST_DNS
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses $IP
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.gateway $GW
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.dns $DNS
         nmcli con modify $LIBVIRT_BRIDGE ipv4.method manual
         nmcli con modify $LIBVIRT_BRIDGE ipv6.method disabled
         if [ -n "${HOST_VLAN}" ] && [ "${HOST_VLAN}" == "${LIBVIRT_VLAN}" ]; then
@@ -538,6 +570,11 @@ function network_rhel83_network_nmcli {
             nmcli con mod ens32 -ipv4.addresses "" -ipv4.gateway "" -ipv4.dns "" ipv4.method disabled
         else
             echo "[DEPLOYER] Adding host NIC $HOST_NIC to $LIBVIRT_BRIDGE"
+            if [ $(nmcli -t con show | grep $HOST_NIC | wc -l) == 0 ]; then
+                nmcli con add ifname $HOST_NIC type ethernet con-name $HOST_NIC
+                nmcli con modify $HOST_NIC ipv4.method disabled
+                nmcli con modify $HOST_NIC ipv6.method ignore
+            fi
             nmcli con mod $HOST_NIC connection.master $LIBVIRT_BRIDGE connection.slave-type bridge
         fi
     else
@@ -559,6 +596,7 @@ function network_rhel83_network_nmcli {
             nmcli con modify $LIBVIRT_NIC connection.master $LIBVIRT_BRIDGE connection.slave-type bridge
         fi
     fi
+    echo "[DEPLOYER] Activating network configuration - you might lose connectivity for up to 20 seconds"
     nmcli con up $LIBVIRT_BRIDGE
     if [ -f "${LIBVIRT_VLAN}" ]; then
         nmcli con up $LIBVIRT_NIC.$LIBVIRT_VLAN
@@ -699,14 +737,14 @@ function vm_generate_ks {
 # Language settings
 lang en_US.UTF-8
 keyboard --vckeymap=us --xlayouts=''
-timezone Etc/UTC --isUtc --ntpservers=$VM_NTP
+timezone Etc/UTC --isUtc --ntpservers=$NTP
 
 # Root password is 'cvpadmin'
 rootpw --iscrypted \$6\$7z9CSB6nxDedcRMy\$WglVJ6UcIlGlIfxjRo/FlyubNA.rewsUKwwqqcjjThK.oahaDGqWRQXS2TARVhmZt95T3Nvig3zvTkiOMdrNr0
 sshpw --username=root --iscrypted \$6\$7z9CSB6nxDedcRMy\$WglVJ6UcIlGlIfxjRo/FlyubNA.rewsUKwwqqcjjThK.oahaDGqWRQXS2TARVhmZt95T3Nvig3zvTkiOMdrNr0 
 
 # Network settings
-network --bootproto=static --device eth0 --ip=$VM_IP --netmask=$VM_NETMASK --gateway=$VM_GW --nameserver=$VM_DNS --noipv6 --activate
+network --bootproto=static --device eth0 --ip=$IP --netmask=$NETMASK --gateway=$GW --nameserver=$DNS --noipv6 --activate
 network  --hostname=$VM_FQDN
 
 # Installer settings
@@ -797,7 +835,7 @@ function vm_install {
         --name $LIBVIRT_VMNAME \
         --memory=$VM_MEMORY,maxmemory=$VM_MEMORY \
         --cpu host-passthrough \
-        --vcpus=$VM_CPU --os-variant=rhel7.7 \
+        --vcpus=$VM_CPU --os-variant=$KVM_OSVARIANT \
         --location=$LIBVIRT_BOOT/centos.iso \
         --network=bridge=$LIBVIRT_BRIDGE,model=virtio \
         --disk path=$LIBVIRT_IMAGES/$LIBVIRT_VMNAME.root.img,size=$VM_DISK_ROOT,bus=virtio,format=raw \
@@ -843,7 +881,7 @@ if [ "${NETWORK}" == 1 ] && [ "${VM}" == 1 ]; then
 elif [ -n "${NETWORK}" ]; then
     if [ -n "${HOST_NIC}" ] && [ -n "${LIBVIRT_NIC}" ]; then
         if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
-            if [ -n "${HOST_IP}" ] && [ -n "${HOST_GW}" ] && [ -n "${HOST_DNS}" ]; then
+            if [ -n "${IP}" ] && [ -n "${GW}" ] && [ -n "${DNS}" ]; then
                 'network_'$DETECTED_DISTRO'_network_'$DETECTED_METHOD
             else
                 echo "[DEPLOYER] Error: Not all necessary parameters set for host network configuration."
@@ -859,7 +897,7 @@ elif [ -n "${NETWORK}" ]; then
     fi
 elif [ -n "${VM}" ]; then
     if [ -n "${CENTOS}" ] && [ -n "${CLOUDVISION}" ]; then
-        if [ -n "${VM_CPU}" ] && [ -n "${VM_MEMORY}" ] && [ -n "${VM_DISK_ROOT}" ] && [ -n "${VM_DISK_DATA}" ] && [ -n "${VM_FQDN}" ] && [ -n "${VM_IP}" ] && [ -n "${VM_NETMASK}" ] && [ -n "${VM_GW}" ] && [ -n "${VM_DNS}" ] && [ -n "${VM_NTP}" ]; then
+        if [ -n "${VM_CPU}" ] && [ -n "${VM_MEMORY}" ] && [ -n "${VM_DISK_ROOT}" ] && [ -n "${VM_DISK_DATA}" ] && [ -n "${VM_FQDN}" ] && [ -n "${IP}" ] && [ -n "${NETMASK}" ] && [ -n "${GW}" ] && [ -n "${DNS}" ] && [ -n "${NTP}" ]; then
             init
             if [ "${CENTOS}" == 'download' ]; then
                 centos_download
@@ -891,6 +929,8 @@ elif [ -n "${VM}" ]; then
             fi
             vm_generate_ks
             vm_install
+            echo "[DEPLOYER] CVP VM deployment completed. Please login with root/cvpadmin."
+            echo "Change the password right away after the first login!"
         else
             echo "[DEPLOYER] Error: VM specification parameters are missing." >&2
         fi
