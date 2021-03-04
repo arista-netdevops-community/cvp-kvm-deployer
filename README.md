@@ -14,6 +14,7 @@ The installation is fully automated and parameterized. It can either use local a
 | CentOS                   | 7.9         |
 | CentOS                   | 8.3         |
 | Debian                   | 10 (buster) |
+| Fedora                   | 32          |
 | Red Hat Enterprise Linux | 7.9         |
 | Red Hat Enterprise Linux | 8.3         |
 
