@@ -1,3 +1,4 @@
+#!/bin/bash
 # ===========================================================================================
 # Copyright (c) 2021 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
@@ -7,6 +8,7 @@
 # == Florian Hibler <florian@arista.com>
 # ===========================================================================================
 # == Supported host operating systems
+# * Fedora 32
 # * Red Hat Enterprise Linux/CentOS 7.9
 # * Red Hat Enterprise Linux/CentOS 8.3
 # ===========================================================================================
@@ -338,10 +340,26 @@ function distro_check {
                     exit 1 
                 fi
             fi    
+         else
+            echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
+            exit 1
+         fi
+    elif [ "${DISTRO}" = "fedora" ]; then
+        if [ "${VERSION}" = "32" ]; then
+            echo "[DEPLOYER] Detected $DISTRO $VERSION"
+            DETECTED_DISTRO=rhel83
+            if [ -n "${NETWORK}" ]; then
+                if [ -f "/usr/bin/nmcli" ]; then
+                    DETECTED_METHOD=nmcli
+                else
+                    echo "[DEPLOYER] Unsupported network configuration method for $DISTRO $VERSION)"
+                    exit 1
+                fi
+            fi
         else
             echo "[DEPLOYER] Unsupported distro version (Detected $DISTRO $VERSION)"
             exit 1
-        fi        
+        fi       
     elif [ "${DISTRO}" = "debian" ]; then
         if [ "${VERSION}" = "10" ]; then
             echo "[DEPLOYER] Detected $DISTRO $VERSION"
