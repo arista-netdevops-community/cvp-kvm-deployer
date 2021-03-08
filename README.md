@@ -14,6 +14,7 @@ The installation is fully automated and parameterized. It can either use local a
 | CentOS                   | 7.9         |
 | CentOS                   | 8.3         |
 | Debian                   | 10 (buster) |
+| Fedora                   | 32          |
 | Red Hat Enterprise Linux | 7.9         |
 | Red Hat Enterprise Linux | 8.3         |
 
@@ -159,3 +160,36 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
 
     ./deploy.sh
         --vm-cleanup
+
+## Additional information
+
+### Fedora 32
+
+On Fedora 32 in a nested virtualization environment (Fedora 32 under ESX 6.5 -> Creating KVM VM for CentOS 7.7 (CloudVision)) an issue had been encountered, which required updating a parameter in GRUB to disable MSR in KVM.
+
+The issue encountered manifests like the following during the installation/start of the VM:
+```
+qemu-system-x86_64: error: failed to set MSR 0x38d to 0x0
+qemu-kvm: error: failed to set MSR 0x48e ...
+```
+
+To mitigate this issue, edit `/etc/default/grub` and append the following statement to the `GRUB_CMDLINE_LINUX` constant:
+```
+kvm.ignore_msrs=1
+```
+
+As an example the result could look like this:
+```
+GRUB_CMDLINE_LINUX="console=ttyS0 console=ttyS0,115200n81 no_timer_check crashkernel=auto rhgb quiet kvm.ignore_msrs=1"
+```
+
+Afterwards update your grub configuration and reboot the hypervisor:
+```
+grub2-mkconfig -o "$(readlink -e /etc/grub2.conf)"
+```
+
+To verify if the fix is active, it shoudl look like this:
+```
+[root@fedora32 ~]# cat /sys/module/kvm/parameters/ignore_msrs
+Y
+```
