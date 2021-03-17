@@ -19,10 +19,12 @@ The installation is fully automated and parameterized. It can either use local a
 | Red Hat Enterprise Linux | 8.3         |
 
 ### CloudVision Portal
-| Product                  | Version  |
-|--------------------------|----------|
-| CloudVision Portal       | 2020.2.x |
-| CloudVision Portal       | 2020.3.x |
+| Product                  | Version  | CentOS   |
+|--------------------------|----------|----------|
+| CloudVision Portal       | 2020.2.x | 7.7.1908 |
+| CloudVision Portal       | 2020.3.x | 7.7.1908 |
+| CloudVision Portal       | 2021.1.x | 7.7.1908 |
+| CloudVision Portal       | 2021.2.x | 7.9.2009 |
 
 ## Parameters
 
@@ -88,21 +90,21 @@ The host NIC configuration will only be touched, if `--host-nic` and `--libvirt-
 ### VM Configuration
 | Option             | Parameter                | Example                         | Required | Description                                                                       |
 |--------------------|--------------------------|---------------------------------|----------|-----------------------------------------------------------------------------------|
-| `--vm`             |                          |                                 | Yes      | Enables VM configuration mode                                                     | 
-| `--centos`         | `download` or local file | /tmp/CentOS.iso                 | Yes      | Downloads CentOS image or uses locally specified file                             | 
-| `--cloudvision`    | `download` or local file | /tmp/cvp-rpm-installer-2020.3.0 | Yes      | Downloads CVP installer or uses locally specified file                            | 
-| `--version`        |  CVP version             | 2020.3.0                        | No       | Specifies CVP version <br> (only if `--cloudvision download`)                     | 
+| `--vm`             |                          |                                 | Yes      | Enables VM configuration mode                            | 
+| `--centos`         | `download` or local file | /tmp/CentOS.iso                 | Yes      | Downloads CentOS image or uses locally specified file    | 
+| `--cloudvision`    | `download` or local file | /tmp/cvp-rpm-installer-2020.3.0 | Yes      | Downloads CVP installer or uses locally specified file   | 
+| `--version`        |  CVP version             | 2020.3.0                        | Yes      | Specifies CVP version                                    | 
 | `--apikey`         |  API key from arista.com | xxxxxxxxxxxxxxxxxxxxxxxxx       | No       | API key for CVP download from arista.com  <br> (only if `--cloudvision download`) | 
-| `--libvirt-bridge` |  Device name             | cvpbr0                          | No       | Name of bridge for CVP VM <br> (default: `cvpbr0`)                                | 
-| `--cpu`            |  VM CPUs                 | 8                               | Yes      | Amount of CPUs in VM <br> (Minimum: 8)                                            | 
-| `--memory`         |  VM memory in GB         | 32                              | Yes      | Amount of memory in VM <br> (Minimum: 16)                                         | 
-| `--rootsize`       |  VM disk size in GB      | 50                              | Yes      | Disk size for root file system <br> (Minimum: 35)                                 | 
-| `--datasize`       |  VM disk size in GB      | 700                             | Yes      | Disk size for data file system <br> (Minimum: 110)                                | 
-| `--vm-fqdn`        |  Hostname + domain name  | cvp.test.local                  | Yes      | Hostname + domain name for CVP VM                                                 | 
-| `--ip`             |  IP address/CIDR         | 192.168.0.11/24                 | Yes      | IP address of CVP VM                                                              | 
-| `--gw`             |  IP address              | 192.168.0.1                     | Yes      | Gateway of CVP VM                                                                 | 
-| `--dns`            |  IP address              | 192.168.0.1                     | Yes      | Name server of CVP VM                                                             | 
-| `--ntp`            |  IP address/FQDN         | pool.ntp.org                    | Yes      | NTP server of CVP VM                                                              | 
+| `--libvirt-bridge` |  Device name             | cvpbr0                          | No       | Name of bridge for CVP VM <br> (default: `cvpbr0`)       | 
+| `--cpu`            |  VM CPUs                 | 8                               | Yes      | Amount of CPUs in VM <br> (Minimum: 8)                   | 
+| `--memory`         |  VM memory in GB         | 32                              | Yes      | Amount of memory in VM <br> (Minimum: 16)                | 
+| `--rootsize`       |  VM disk size in GB      | 50                              | Yes      | Disk size for root file system <br> (Minimum: 35)        | 
+| `--datasize`       |  VM disk size in GB      | 700                             | Yes      | Disk size for data file system <br> (Minimum: 110)       | 
+| `--vm-fqdn`        |  Hostname + domain name  | cvp.test.local                  | Yes      | Hostname + domain name for CVP VM                        | 
+| `--ip`             |  IP address/CIDR         | 192.168.0.11/24                 | Yes      | IP address of CVP VM                                     | 
+| `--gw`             |  IP address              | 192.168.0.1                     | Yes      | Gateway of CVP VM                                        | 
+| `--dns`            |  IP address              | 192.168.0.1                     | Yes      | Name server of CVP VM                                    | 
+| `--ntp`            |  IP address/FQDN         | pool.ntp.org                    | Yes      | NTP server of CVP VM                                     | 
 
 **Example**
 

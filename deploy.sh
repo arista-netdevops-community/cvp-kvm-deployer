@@ -8,6 +8,7 @@
 # == Florian Hibler <florian@arista.com>
 # ===========================================================================================
 # == Supported host operating systems
+# * Debian 10 (buster)
 # * Fedora 32
 # * Red Hat Enterprise Linux/CentOS 7.9
 # * Red Hat Enterprise Linux/CentOS 8.3
@@ -24,12 +25,12 @@
 #   --libvirt-bridge <optional - (default: 'cvpbr0') - Bridge for libvirt use (do not use 'virbr0')> \
 #   --libvirt-vlan <optional - libvirt VLAN (tagged) on Host NIC>
 # ===========================================================================================
-# == Usage (CVP VM)
+# == Usage (CVP VM)s
 # ./deploy.sh \
 #   --vm
 #   --centos <'download' or local file> \
 #   --cloudvision <'download' or local file> \
-#   --version <CloudVision - only required if '--cloudvision download'> \
+#   --version <CloudVision - required> \
 #   --apikey <API key from arista.com - only required if '--cloudvision download'> \
 #   --libvirt-bridge <optional - (default: 'cvpbr0') - Bridge VM will be connected to> \
 #   --cpu <Amount of vCPUs - minimum 8> \
@@ -288,7 +289,7 @@ eval set -- "$PARAMS"
 function distro_check {
     #DISTRO=$(awk 'match($0, /.*^ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
     #VERSION=$(awk 'match($0, /.*^VERSION_ID=\"\s*([^\n\r]*)\"/, m) { print m[1]; }' < /etc/os-release)
-    DISTRO=$(awk -F= '$1=="ID" { print $2 ;}' /etc/os-release)
+    DISTRO=$(awk -F= '$1=="ID" { print $2 ;}' /etc/os-release | tr -d '"')
     VERSION=$(awk -F= '$1=="VERSION_ID" { print $2 ;}' /etc/os-release | tr -d '"')
     if [ "${DISTRO}" = "centos" ]; then
         if [ "${VERSION}" = "7" ]; then
@@ -302,7 +303,7 @@ function distro_check {
                     exit 1 
                 fi
             fi
-        elif [ "${VERSION}" = "8" ] | [ "${VERSION}" = "8.3" ]; then
+        elif [ "${VERSION}" = "8" ] || [ "${VERSION}" = "8.3" ]; then
             echo "[DEPLOYER] Detected $DISTRO $VERSION"
             DETECTED_DISTRO=rhel83
                 if [ -n "${NETWORK}" ]; then
@@ -469,7 +470,7 @@ function network_rhel79_network_nmcli {
 
     if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
         echo "[DEPLOYER] Applying hypervisor IPv4 configuration to $LIBVIRT_BRIDGE"
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses $IP
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses ${IP}/${CIDR}
         nmcli con modify $LIBVIRT_BRIDGE ipv4.gateway $GW
         nmcli con modify $LIBVIRT_BRIDGE ipv4.dns $DNS
         nmcli con modify $LIBVIRT_BRIDGE ipv4.method manual
@@ -574,7 +575,7 @@ function network_rhel83_network_nmcli {
 
     if [ "${HOST_NIC}" == "${LIBVIRT_NIC}" ]; then
         echo "[DEPLOYER] Applying hypervisor IPv4 configuration to $LIBVIRT_BRIDGE"
-        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses $IP
+        nmcli con modify $LIBVIRT_BRIDGE ipv4.addresses ${IP}/${CIDR}
         nmcli con modify $LIBVIRT_BRIDGE ipv4.gateway $GW
         nmcli con modify $LIBVIRT_BRIDGE ipv4.dns $DNS
         nmcli con modify $LIBVIRT_BRIDGE ipv4.method manual
@@ -636,7 +637,29 @@ function network_rhel83_network_nmcli {
 # == CentOS Image variables
 # ===========================================================================================
 function centos_download {
-    CENTOS_URL=http://mirror.nsc.liu.se/centos-store/7.7.1908/isos/x86_64/CentOS-7-x86_64-Minimal-1908.iso
+    if [ ! -n "${CLOUDVISION_VERSION}" ]; then
+        echo "[DEPLOYER] Error: CloudVision Version '--version' has to be specified in order to select the correct CentOS image for download" >&2
+        exit 1
+    elif [[ "${CLOUDVISION_VERSION}" =~ "2020.2" ]]; then
+        CENTOS_VERSION="7.7.1908"
+    elif [[ "${CLOUDVISION_VERSION}" =~ "2020.3" ]]; then
+        CENTOS_VERSION="7.7.1908"
+    elif [[ "${CLOUDVISION_VERSION}" =~ "2021.1" ]]; then
+        CENTOS_VERSION="7.7.1908"
+    elif [[ "${CLOUDVISION_VERSION}" =~ "2021.2" ]]; then
+        CENTOS_VERSION="7.9.2009"
+    else
+        echo "[DEPLOYER] Error: CloudVision Version '--version' is not supported by this script. Please download appropriate CentOS manually." >&2
+        exit 1
+    fi
+    if [[ "${CENTOS_VERSION}" =~ "7.7.1908" ]]; then
+        CENTOS_URL=http://mirror.nsc.liu.se/centos-store/7.7.1908/isos/x86_64/CentOS-7-x86_64-Minimal-1908.iso
+    elif [[ "${CENTOS_VERSION}" =~ "7.9.2009" ]]; then
+        CENTOS_URL=http://centos.anexia.at/centos/7.9.2009/isos/x86_64/CentOS-7-x86_64-Minimal-2009.iso
+    else
+        echo "[DEPLOYER] Error: CentOS Version could not be detected automatically. Please download appropriate CentOS manually." >&2
+        exit 1
+    fi 
     CENTOS=/tmp/cvp/centos/centos.iso
     CENTOS_DOWNLOAD=1
     mkdir -p /tmp/cvp/centos
@@ -914,7 +937,7 @@ elif [ -n "${NETWORK}" ]; then
         exit 1
     fi
 elif [ -n "${VM}" ]; then
-    if [ -n "${CENTOS}" ] && [ -n "${CLOUDVISION}" ]; then
+    if [ -n "${CENTOS}" ] && [ -n "${CLOUDVISION}" ] && [ -n "${CLOUDVISION_VERSION}" ]; then
         if [ -n "${VM_CPU}" ] && [ -n "${VM_MEMORY}" ] && [ -n "${VM_DISK_ROOT}" ] && [ -n "${VM_DISK_DATA}" ] && [ -n "${VM_FQDN}" ] && [ -n "${IP}" ] && [ -n "${NETMASK}" ] && [ -n "${GW}" ] && [ -n "${DNS}" ] && [ -n "${NTP}" ]; then
             init
             if [ "${CENTOS}" == 'download' ]; then
@@ -930,10 +953,6 @@ elif [ -n "${VM}" ]; then
             if [ "${CLOUDVISION}" == 'download' ]; then
                 if [ ! -n "${APIKEY}" ]; then
                     echo "[DEPLOYER] Error: '--apikey' for arista.com has to be specified in order to download CloudVision" >&2
-                    exit 1
-                fi
-                if [ ! -n "${CLOUDVISION_VERSION}" ]; then
-                    echo "[DEPLOYER] Error: '--version' has to be specified in order to download CloudVision" >&2
                     exit 1
                 fi
                 cloudvision_download
@@ -953,7 +972,7 @@ elif [ -n "${VM}" ]; then
             echo "[DEPLOYER] Error: VM specification parameters are missing." >&2
         fi
     else
-        echo "[DEPLOYER] Error: Required parameter '--centos' or '--cloudvision' is missing" >&2
+        echo "[DEPLOYER] Error: Required parameter '--centos', '--cloudvision', '--version' is missing" >&2
         exit 1
     fi
 else
