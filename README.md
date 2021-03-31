@@ -11,6 +11,7 @@ The installation is fully automated and parameterized. It can either use local a
 ### Host Operating System
 | Distribution             | Version     |
 |--------------------------|-------------|
+| Alma Linux               | 8.3         |
 | CentOS                   | 7.9         |
 | CentOS                   | 8.3         |
 | Debian                   | 10 (buster) |
