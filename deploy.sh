@@ -31,6 +31,7 @@
 #   --centos <'download' or local file> \
 #   --cloudvision <'download' or local file> \
 #   --version <CloudVision - required> \
+#   --install-cmd <Command to install CVP> \
 #   --apikey <API key from arista.com - only required if '--cloudvision download'> \
 #   --libvirt-bridge <optional - (default: 'cvpbr0') - Bridge VM will be connected to> \
 #   --cpu <Amount of vCPUs - minimum 8> \
