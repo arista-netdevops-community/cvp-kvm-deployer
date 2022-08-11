@@ -162,6 +162,15 @@ while (( "$#" )); do
                 exit 1
             fi
             ;;
+        --install-cmd)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                CLOUDVISION_CMDLINE=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
          --cpu)
             if [ -n "$2" ] && [ "${2}" -lt 8  ]; then
                 echo "Error: Minimum of 8 VM CPUs required" >&2
