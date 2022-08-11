@@ -870,7 +870,15 @@ kexec-tools
 mkdir /tmp/cvprpm
 mount /dev/sr1 /tmp/cvprpm
 cd /tmp/cvprpm
-bash ./cvp-rpm-installer* --type demo
+EOF
+
+if [ "o$CLOUDVISION_CMDLINE" != "o" ]; then
+   echo "${CLOUDVISION_CMDLINE}" >> /tmp/cvp/ks.cfg
+else
+   echo "bash ./cvp-rpm-installer* --type demo" >> /tmp/cvp/ks.cfg
+fi
+
+cat <<EOF >> /tmp/cvp/ks.cfg
 cd / 
 umount /tmp/cvprpm
 %end
