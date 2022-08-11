@@ -31,6 +31,7 @@
 #   --centos <'download' or local file> \
 #   --cloudvision <'download' or local file> \
 #   --version <CloudVision - required> \
+#   --install-cmd <Command to install CVP> \
 #   --apikey <API key from arista.com - only required if '--cloudvision download'> \
 #   --libvirt-bridge <optional - (default: 'cvpbr0') - Bridge VM will be connected to> \
 #   --cpu <Amount of vCPUs - minimum 8> \
@@ -156,6 +157,15 @@ while (( "$#" )); do
         --version)
             if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
                 CLOUDVISION_VERSION=$2
+                shift 2
+            else
+                echo "Error: Argument for $1 is missing" >&2
+                exit 1
+            fi
+            ;;
+        --install-cmd)
+            if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+                CLOUDVISION_CMDLINE=$2
                 shift 2
             else
                 echo "Error: Argument for $1 is missing" >&2
@@ -861,7 +871,15 @@ kexec-tools
 mkdir /tmp/cvprpm
 mount /dev/sr1 /tmp/cvprpm
 cd /tmp/cvprpm
-bash ./cvp-rpm-installer* --type demo
+EOF
+
+if [ "o$CLOUDVISION_CMDLINE" != "o" ]; then
+   echo "${CLOUDVISION_CMDLINE}" >> /tmp/cvp/ks.cfg
+else
+   echo "bash ./cvp-rpm-installer* --type demo" >> /tmp/cvp/ks.cfg
+fi
+
+cat <<EOF >> /tmp/cvp/ks.cfg
 cd / 
 umount /tmp/cvprpm
 %end
